@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html>
+<head>
+    
+    <title>Reisen mit Flickr</title>
+    
+    
+<!--    Load all the bibs and their own stylesheets-->
+    
+    <link rel="stylesheet" href="http://cdn.leafletjs.com/leaflet/v0.7.7/leaflet.css" />
+    <script src="http://cdn.leafletjs.com/leaflet/v0.7.7/leaflet.js"></script>
+    
+    <link rel="stylesheet" href="css/L.Control.MousePosition.css" />
+    <script src="js/L.Control.MousePosition.js"></script>
+    <script src="https://code.jquery.com/jquery-1.10.2.js"></script>
+    
+    <link href='https://api.mapbox.com/mapbox.js/plugins/leaflet-draw/v0.2.2/leaflet.draw.css' rel='stylesheet' />
+    <script src='https://api.mapbox.com/mapbox.js/plugins/leaflet-draw/v0.2.2/leaflet.draw.js'></script>
+    
+    <link rel="stylesheet" href="http://labs.easyblog.it/maps/leaflet-search/src/leaflet-search.css" />
+    
+    <script src="http://labs.easyblog.it/maps/leaflet-search/src/leaflet-search.js"></script>
+    
+    <meta charset="UTF-8">
+    
+    <style>
+        
+/*    Stylesheet of the app    */
+        
+    body {
+        width: 100%;
+        height: 100%;
+        padding: 0;
+        margin: 0;
+    }
+        
+    #viz {
+        width: 1020px;
+        height: 550px;
+        background: white;
+    }
+          
+    #map {
+        width: 500px;
+        height: 500px;
+        background: black;
+        float: left;
+    }
+        
+        #photo {
+        top:100px;
+        right:10px;
+        width: 500px;
+        height: 500px;
+        background: white;
+        float: right;
+    }
+        
+        #control {
+        
+        width: 200px;
+        height: 50px;
+        float: right;
+
+        }
+        
+        
+</style>
+
+<script>
+   
+//    All the variables are declared here
+    
+    var map;
+    var osm;
+    var lat;
+    var lon;
+    var url_flickr;
+    var url_flickr2;
+    
+//    10 meters (can be changed). 
+    
+    var radius = 0.01;
+    
+//    The path
+    
+    var path = [];
+    
+//    Test for the GET funktion of the Flickr API
+    
+    var charge_ok = false;
+    
+//    Array for the pictures
+    
+    var tab_photo = [];
+    
+//    Array for the pictures which are showed
+    
+    var tab_photo_fin = [];
+    
+//    Array for the geocodes
+    
+    var tab_id_photo = [];
+    
+//    Picture selected after the random
+    
+    var photo;
+    
+//Count of the pictures in arrays
+    
+    var nb_photo;
+    var nb_photo2;
+    
+//    Index of the currently showed picture
+    
+    var index;
+
+       
+    window.onload = function () {
+
+//        Map is centered on Dortmund with a zoom = 15
+        
+    map = L.map('map').setView([51.514123, 7.465033], 15);
+    var osmUrl='http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+    var osmAttrib='Map data © <a href="http://openstreetmap.org">OpenStreetMap</a> contributors';
+    osm = new L.TileLayer(osmUrl, {minZoom: 1, maxZoom: 20, attribution: osmAttrib});
+    
+//    The map layer comes from Open Street Map
+        
+    map.addLayer(osm); 
+    console.log("before init");
+    console.log("initialized");
+        
+//        Lib for the position of the mouse
+        
+    L.control.mousePosition().addTo(map);
+        
+ //        Lib for the search function
+        
+    map.addControl( new L.Control.Search({
+			url: 'http://nominatim.openstreetmap.org/search?format=json&q={s}',
+			jsonpParam: 'json_callback',
+			propertyName: 'display_name',
+			propertyLoc: ['lat','lon'],
+			circleLocation: false,
+			markerLocation: false,			
+			autoType: false,
+			autoCollapse: true,
+			minLength: 2,
+			zoom:15
+		}) );
+    
+    
+//        Event on click = put a marker
+
+    map.on('click', onMapClick);        
+     };
+     
+    
+//    All the functions wich are used in the code above
+    
+    
+//        Event on click = put a marker
+
+    
+    
+    function onMapClick(e) {
+            
+            path = [];
+        
+//        Add the marker
+
+	 	    var marker = L.marker(e.latlng, {
+	 	        draggable: true,
+	 	        riseOnHover: true
+                
+	 	    }).addTo(map);
+        
+        console.log(e.latlng);
+        
+        
+//        Get the geocodes for the Flickr query with latlng (already in leaflet)
+        
+                lat = e.latlng.lat;
+                lon = e.latlng.lng;
+        
+//        URL for the Flickr query which get all the URL of all the picture around the geocodes of the marker
+        
+url_flickr = "https://api.flickr.com/services/rest/?method=flickr.photos.search&api_key=650e87c48c00d39cb61a9fd3dbab62a1&lat=" + lat + "&lon=" + lon + "&radius=" + radius + "&extras=url_m&format=json&jsoncallback=?";   
+        
+        //        URL for the Flickr query which get all the geocodes of all the picture around the geocodes of the marker
+        
+url_flickr2 = "https://api.flickr.com/services/rest/?method=flickr.photos.search&api_key=650e87c48c00d39cb61a9fd3dbab62a1&lat=" + lat + "&lon=" + lon + "&radius=" + radius + "&extras=geo&format=json&jsoncallback=?";     
+                    
+        console.log(url_flickr);
+        console.log(url_flickr2);
+        
+        
+//            Flickr produced a json which is analysed after it's loaded
+    
+            $.getJSON(url_flickr).done(
+                    
+                    
+                    function( data ) {
+                        
+                        
+//                        all the URL of the pictures are put in an array
+                        
+                                 $.each(data.photos.photo, function(i,item){
+                                     tab_photo.push(item.url_m);
+                                
+                                 });
+                        
+//                        Test if there is at least 1 picture
+                        
+                        if (tab_photo.length > 0) { 
+                            
+//                            Get 1 URL in the array randomly
+                            
+                        photo = tab_photo[Math.floor(Math.random()*tab_photo.length)]; 
+                            
+                            
+ //                        Test if the picture was already showed (if it is in the final array of pictures)
+
+                            
+                            var test = $.inArray(photo, tab_photo_fin);
+                            console.log(test);
+                            
+                            if (test == -1) {
+                                
+//                          If the picture is not already in the final array, it's put in
+                                
+                        tab_photo_fin.push(photo);
+                        document.getElementById('photo_fin').src = photo;
+                        
+//                        Upadte the index of the picture which will be shown
+                            
+                        index = tab_photo_fin.length-1;
+                                
+//                        Make a blue circle to show where the picture was showed
+                                
+                        var circle = L.circle([lat, lon], 1, {fill: 'true', color:'blue'}).addTo(map); 
+                        
+                        };        
+                        };
+                        
+//                        When this first query is finished comes the second
+                        
+                        },$.getJSON(url_flickr2).done(
+                    function( data ) {   
+                        
+//                        A new array is produced with the geocodes of all the pictures around the marker
+                        
+                     $.each(data.photos.photo, function(i,item){    
+                         
+ //                        Test if the geocode/id was already showed (if it is in the final array of ids)
+                         
+                         var test2 = $.inArray(item.id, tab_id_photo);
+                        if (test2 == -1) {      
+                            
+//                          If the id is not already in the final array of id, it's put in
+
+                        tab_id_photo.push(item.id);
+                            
+//                        Make a green circle to show all the geocode of pictures around the marker ($.each function is a repeat function)
+
+                        var circle = L.circle([item.latitude, item.longitude], 1, {fill: 'true', color:'green'}).addTo(map);  
+                        };
+                         
+                      });
+                    
+                        }
+            ),
+                
+//            Set the test for the end of the Flickr query on true. Query is finished
+                
+            charge_ok = true,
+
+//                Empty the array of URL
+                
+            tab_photo = []
+
+            ); 
+        
+//        Event on drag the marker
+
+        
+	 	    marker.on("drag", function (ev) {
+                
+//               Test if there if the last query is finished
+
+                    
+                if (charge_ok == true){
+                    
+//                    Get the current geocode of the marker
+                  
+	 	        var chagedPos = ev.target.getLatLng();
+                path.push(chagedPos);
+                lat = chagedPos.lat;
+                lon = chagedPos.lng;
+                
+//                Set the test of finished process on false, it can go further just when the next query process is over
+
+//                    A VOIR SI CHARGEMENT
+                charge_ok = false; 
+                console.log(charge_ok);           
+            var polyline = L.polyline(path, {color: 'red', weight : 2}).addTo(map);
+                           
+                    
+                    url_flickr = "https://api.flickr.com/services/rest/?method=flickr.photos.search&api_key=650e87c48c00d39cb61a9fd3dbab62a1&lat=" + lat + "&lon=" + lon + "&radius=" + radius + "&extras=url_m&format=json&jsoncallback=?";
+                    
+                    
+                    url_flickr2 = "https://api.flickr.com/services/rest/?method=flickr.photos.search&api_key=650e87c48c00d39cb61a9fd3dbab62a1&lat=" + lat + "&lon=" + lon + "&radius=" + radius + "&extras=geo&format=json&jsoncallback=?"; 
+                    
+                    console.log(url_flickr);
+                    console.log(url_flickr2);
+
+                $.getJSON(url_flickr).done(
+                    function( data ) {
+                        $.each(data.photos.photo, function(i,item){                            
+                                tab_photo.push(item.url_m);
+                                 });
+                        if (tab_photo.length > 0) {
+                        photo = tab_photo[Math.floor(Math.random()*tab_photo.length)];
+                            var test = $.inArray(photo, tab_photo_fin);
+                            console.log(test);
+                            if (test == -1) {
+                        tab_photo_fin.push(photo);
+                        index = tab_photo_fin.length-1;
+                        var circle = L.circle([lat, lon], 1, {fill: 'true', color:'blue'}).addTo(map);
+                            };
+                        };
+                        },
+                    $.getJSON(url_flickr2).done(
+                    function( data ) {
+                        $.each(data.photos.photo, function(i,item){
+                        var test2 = $.inArray(item.id, tab_id_photo);
+                        if (test2 == -1) {                        
+                        tab_id_photo.push(item.id);
+                        var circle = L.circle([item.latitude, item.longitude], 1, {fill: 'true', color:'green'}).addTo(map);
+                        document.getElementById('photo_fin').src = photo;
+
+                        };
+                    });
+                                          
+                        }
+            ),
+            charge_ok = true,
+            tab_photo = [],                        
+            console.log(charge_ok),
+                    
+//            Center the map on the current position of the marker    
+            
+            map.panTo(new L.LatLng(lat, lon))
+ 
+                );
+                    
+//          For the console.log variables of the counts of showed pictures and geocodes are updated
+                      
+            nb_photo = tab_photo_fin.length;
+            nb_photo2 = tab_id_photo.length;
+            console.log(nb_photo);
+            console.log(nb_photo2);
+            console.log(charge_ok);                   
+                    
+            };
+
+        });
+                
+	 	};  
+    
+    
+//    Button to show the next picture
+    
+    function avant() {
+  
+//        Test if were are at the beginning of the array (otherwise error)
+        
+        if (index > 0){
+        document.getElementById('photo_fin').src = tab_photo_fin[index-1];            
+        index--;
+         };
+    };
+    
+//    Button to show the former picture
+
+    
+     function arriere() {
+         
+         
+//        Test if were are at the end of the array (otherwise error)
+
+         
+         if (index < (tab_photo_fin.length-1)){
+        document.getElementById('photo_fin').src = tab_photo_fin[index + 1];
+        index++;
+
+         };    
+    };
+    
+    
+//    Reset button    
+
+    function reset() {
+
+    location.reload();
+            
+    }; 
+                
+</script>
+
+</head>
+
+<body>
+
+            <div id="viz">
+                <div id="map"></div>
+                <div id="photo">
+                <img id="photo_fin" src="">
+                </div>
+
+                <div id="control">
+                <input type="button" onclick="avant()" value="-"></input>
+                <input type="button" onclick="arriere()" value="+"></input>
+    
+                <input type="button" onclick="reset()" value="Reset"></input>
+                </div>
+                
+            </div>
+    
+    
+    </body>
+</html>
